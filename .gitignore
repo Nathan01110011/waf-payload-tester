@@ -27,3 +27,5 @@ replay_pid*
 build
 .idea
 gradle
+.DS_Store
+report.pdf

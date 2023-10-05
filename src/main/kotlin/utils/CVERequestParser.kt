@@ -7,7 +7,6 @@ fun parseMajorCVEs(filename: String): List<MajorCVE> {
     return File(filename).readLines()
         .drop(1) // Drop the header row
         .map { line ->
-            println("Processing line: $line") // Add this debug line
             val parts = line.split("|")
             MajorCVE(
                 cve = parts[0],
