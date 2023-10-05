@@ -136,16 +136,13 @@ fun addPayloadResultsTable(document: Document, payloadResultsList: List<PayloadR
 
         // Filter table with only failed payloads if enabled, remove ones that worked for clarity
         val filteredList = if (onlyFailures) {
-            payloadResultsList.filter { it.statusCode != HTTP_FORBIDDEN_CODE }
+            results.filter { it.statusCode != HTTP_FORBIDDEN_CODE }
         } else {
-            payloadResultsList
+            results
         }
 
-        // Sort payloads back in order
-        val sortedList = filteredList.sortedBy { it.payload }
-
         // Fill the table with data
-        sortedList.forEach { result ->
+        filteredList.forEach { result ->
             table.addCell(Paragraph(result.payload.insertBreaksEvery(55)).setFontSize(10f))
             table.addCell(result.source).setFontSize(10f)
             table.addCell(result.statusCode.toString()).setTextAlignment(TextAlignment.CENTER).setFontSize(10f)

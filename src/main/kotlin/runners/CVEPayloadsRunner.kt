@@ -54,16 +54,27 @@ object CVEPayloadsRunner {
             }
 
             "POST" -> {
-                if (request.headers["Content-Type"] == "application/json") {
-                    val (_, response, _) = Fuel.post(urlWithQueryString)
-                        .header(request.headers)
-                        .body(request.post_data ?: "")
-                        .response()
-                    response
-                } else {
-                    // TODO: Handle non-JSON POST requests. Adjust as necessary.
-                    val (_, response, _) = Fuel.post(urlWithQueryString).header(request.headers).response()
-                    response
+                when(request.headers["Content-Type"]) {
+                    "application/json" -> {
+                        val (_, response, _) = Fuel.post(urlWithQueryString)
+                            .header(request.headers)
+                            .body(request.post_data ?: "")
+                            .response()
+                        response
+                    }
+                    "application/x-www-form-urlencoded" -> {
+                        // For application/x-www-form-urlencoded, we assume the post_data is already in the form "key1=value1&key2=value2..."
+                        val (_, response, _) = Fuel.post(urlWithQueryString)
+                            .header(request.headers)
+                            .body(request.post_data ?: "")
+                            .response()
+                        response
+                    }
+                    else -> {
+                        // Handle other content types for POST or fallback to just sending the request without a specific body
+                        val (_, response, _) = Fuel.post(urlWithQueryString).header(request.headers).response()
+                        response
+                    }
                 }
             }
 
