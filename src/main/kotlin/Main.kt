@@ -1,8 +1,8 @@
+
 import Constants.ONLY_FAILURES_IN_REPORT
 import Constants.REPORT_PATH
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import runners.CVEPayloadsRunner
 import runners.GenericPayloadRunner
 import utils.createPDF
 
@@ -16,11 +16,12 @@ fun main() {
 
 private fun startBenchmarkTool() {
     // Payload Testers
-    val cveResultList = CVEPayloadsRunner.runRequests()
+//    val cveResultList = CVEPayloadsRunner.runRequests()
     val genericResultsList = GenericPayloadRunner.runRequests()
 
     // Generating Report
     val outputPath = REPORT_PATH
-    createPDF(outputPath, cveResultList, genericResultsList, ONLY_FAILURES_IN_REPORT)
+    createPDF(outputPath, genericResultsList, ONLY_FAILURES_IN_REPORT)
+//    createPDF(outputPath, genericResultsList, ONLY_FAILURES_IN_REPORT)
 }
 

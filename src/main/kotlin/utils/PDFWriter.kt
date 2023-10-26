@@ -1,7 +1,6 @@
 package utils
 
 import Constants.HTTP_FORBIDDEN_CODE
-import classes.MajorCVEResult
 import classes.PayloadResult
 import com.itextpdf.io.font.constants.StandardFonts
 import com.itextpdf.io.image.ImageDataFactory
@@ -24,142 +23,115 @@ import org.jetbrains.letsPlot.scale.scaleFillManual
 import org.jetbrains.letsPlot.themes.elementBlank
 import org.jetbrains.letsPlot.themes.elementText
 import org.jetbrains.letsPlot.themes.theme
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import runners.GenericPayloadRunner
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.imageio.ImageIO
 
+private val logger: Logger = LoggerFactory.getLogger(GenericPayloadRunner::class.java)
 
-fun createPDF(
-    outputPath: String,
-    cveResultList: List<MajorCVEResult>,
-    genericResultsList: List<PayloadResult>,
-    onlyFailures: Boolean = false
-) {
-    val writer = PdfWriter(outputPath)
-    val pdfDoc = com.itextpdf.kernel.pdf.PdfDocument(writer)
-    val document = Document(pdfDoc)
-
-    val titleFont: PdfFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD)
-    val title = Paragraph("Vulnerability Report")
-        .setFont(titleFont)
-        .setFontSize(24f)
-        .setTextAlignment(TextAlignment.CENTER)
-        .setFixedLeading(30f)
-
-    val separator = LineSeparator(DashedLine())
-    document.add(title)
-    document.add(separator)
-
-    addCVEResultsTable(document, cveResultList, onlyFailures)
-    addPayloadResultsTable(document, genericResultsList, onlyFailures)
-
-    document.close()
+fun createPDF(outputPath: String, genericResultsList: List<PayloadResult>, onlyFailures: Boolean = false) {
+    logger.info("******** Starting Report PDF File Generation ********")
+    Document(PdfWriter(outputPath).let { com.itextpdf.kernel.pdf.PdfDocument(it) }).apply {
+        add(createTitle())
+        add(LineSeparator(DashedLine()))
+        addResultsTables(this, genericResultsList, onlyFailures)
+        close()
+    }
+    logger.info("******** Report PDF File Generation Complete ********")
 }
+fun createTitle(): Paragraph = Paragraph("Vulnerability Report")
+    .setFont(PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD))
+    .setFontSize(24f)
+    .setTextAlignment(TextAlignment.CENTER)
+    .setFixedLeading(30f)
 
-fun addCVEResultsTable(document: Document, cveResultList: List<MajorCVEResult>, onlyFailures: Boolean) {
-    val table = Table(floatArrayOf(25f, 40f, 15f, 20f))
-    val headerFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD)
-    val headerBgColor = DeviceRgb(224, 236, 255)
-
-    val blocked = cveResultList.filter { it.httpCode == HTTP_FORBIDDEN_CODE }.size
-    val total = cveResultList.size
-    val successRate = (blocked.toDouble() / total) * 100
-    val fails = total - blocked
-
-    val fileHeading = "Specific CVEs - Success Rate: $successRate%"
-    document.add(Paragraph(fileHeading).setBold().setFontSize(14f))
-
-    arrayOf("CVE Code", "POC Link", "HTTP Code", "Result").forEach { header ->
-        val cell = Cell()
-        cell.add(Paragraph(header).setBold().setFontSize(12f))
-        cell.setFont(headerFont).setFontSize(12f)
-        cell.setBackgroundColor(headerBgColor)
-        cell.setTextAlignment(TextAlignment.CENTER)
-        cell.setVerticalAlignment(VerticalAlignment.MIDDLE)
-        table.addCell(cell)
-    }
-
-    val filteredList = if (onlyFailures) {
-        cveResultList.filter { it.result == "Failed" }
-    } else {
-        cveResultList
-    }
-
-    filteredList.forEach { result ->
-        table.addCell(result.cve)
-        table.addCell(result.source)
-        table.addCell(result.httpCode.toString()).setTextAlignment(TextAlignment.CENTER)
-        table.addCell(result.result)
-    }
-
-    val pieChartImage = generatePieChart(blocked, fails)
-    val baos = ByteArrayOutputStream()
-    ImageIO.write(pieChartImage, "png", baos)
-    val pieImageData = ImageDataFactory.create(baos.toByteArray())
-    document.add(Image(pieImageData))
-
-    document.add(table)
-    document.add(AreaBreak());
-}
-
-fun addPayloadResultsTable(document: Document, payloadResultsList: List<PayloadResult>, onlyFailures: Boolean) {
-
-    val groupedResults = payloadResultsList.groupBy { it.type } // Group results by file type
-
+fun addResultsTables(document: Document, payloadResultsList: List<PayloadResult>, onlyFailures: Boolean) {
     val headerFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD)
     val headerBgColor = DeviceRgb(224, 236, 255) // A light blue color
 
-    groupedResults.forEach { (type, results) ->
-        // Calculate the success rate for this file type
-        val blocked = results.filter { it.statusCode == HTTP_FORBIDDEN_CODE }.size
-        val total = results.size
-        val successRate = (blocked.toDouble() / total) * 100
-        val fails = total - blocked
+    payloadResultsList.groupBy { it.type }.forEach { (type, results) ->
+        val (blocked, total, fails) = calculateStatistics(results)
+        val successRate = "%.2f".format((blocked.toDouble() / total) * 100)
 
-        val fileHeading = "$type - Success Rate: $successRate%"
-        document.add(Paragraph(fileHeading).setBold().setFontSize(14f))
-
-        val table = Table(floatArrayOf(61f, 13f, 13f, 13f))
-
-        // Add the column headers
-        arrayOf("Payload", "Source", "HTTP Code", "Result").forEach { header ->
-            val cell = Cell()
-            cell.add(Paragraph(header).setBold().setFontSize(12f))
-            cell.setFont(headerFont).setFontSize(12f)
-            cell.setBackgroundColor(headerBgColor)
-            cell.setTextAlignment(TextAlignment.CENTER)
-            cell.setVerticalAlignment(VerticalAlignment.MIDDLE)
-            table.addCell(cell)
+        document.apply {
+            add(Paragraph("$type - Success Rate: $successRate%").setBold().setFontSize(14f))
+            add(createImageFromChart(generatePieChart(blocked, fails)))
+            add(Paragraph("Test Type Success Rate Breakdown").setBold().setFontSize(14f).setTextAlignment(TextAlignment.CENTER))
+            add(createSummaryTable(results, headerFont, headerBgColor))
+            add(Paragraph("Payloads and Results").setBold().setFontSize(14f).setTextAlignment(TextAlignment.CENTER))
+            add(createTableWithResults(type, results, onlyFailures, headerFont, headerBgColor))
+            add(AreaBreak())
         }
-
-        // Filter table with only failed payloads if enabled, remove ones that worked for clarity
-        val filteredList = if (onlyFailures) {
-            payloadResultsList.filter { it.statusCode != HTTP_FORBIDDEN_CODE }
-        } else {
-            payloadResultsList
-        }
-
-        // Sort payloads back in order
-        val sortedList = filteredList.sortedBy { it.payload }
-
-        // Fill the table with data
-        sortedList.forEach { result ->
-            table.addCell(Paragraph(result.payload.insertBreaksEvery(55)).setFontSize(10f))
-            table.addCell(result.source).setFontSize(10f)
-            table.addCell(result.statusCode.toString()).setTextAlignment(TextAlignment.CENTER).setFontSize(10f)
-            table.addCell(if (result.statusCode == HTTP_FORBIDDEN_CODE) "Success" else "Failed")
-        }
-
-        val pieChartImage = generatePieChart(blocked, fails)
-        val baos = ByteArrayOutputStream()
-        ImageIO.write(pieChartImage, "png", baos)
-        val pieImageData = ImageDataFactory.create(baos.toByteArray())
-        document.add(Image(pieImageData))
-        document.add(table)
-        document.add(AreaBreak());
     }
+}
+
+fun calculateStatistics(results: List<PayloadResult>) = Triple(
+    results.count { it.statusCode == HTTP_FORBIDDEN_CODE },
+    results.size,
+    results.size - results.count { it.statusCode == HTTP_FORBIDDEN_CODE }
+)
+
+fun createTableWithResults(type: String, results: List<PayloadResult>, onlyFailures: Boolean, headerFont: PdfFont, headerBgColor: DeviceRgb) = Table(floatArrayOf(50f, 15f, 15f, 20f)).apply {
+    // Directly create and add the header cells to the table
+    val headers = arrayOf("Payload", "Source", "HTTP Code", "Result")
+    headers.forEach { addCell(createStyledCell(it, headerFont, headerBgColor, 12f)) }
+
+    val filteredResults = if (onlyFailures) results.filter { it.statusCode != HTTP_FORBIDDEN_CODE } else results
+    filteredResults.forEach { result ->
+
+        addCell(Paragraph(result.payload.chunked(55).joinToString("\n")).setFontSize(10f))
+        addCell(Paragraph(result.source).setFontSize(10f))
+        addCell(Paragraph(result.statusCode.toString()).setFontSize(10f).setTextAlignment(TextAlignment.CENTER))
+
+        // Adding result cell, assuming a logic like: if statusCode is HTTP_FORBIDDEN_CODE then it's "Blocked" otherwise "Failed"
+        val resultText = if (result.statusCode == HTTP_FORBIDDEN_CODE) "Blocked" else "Failed"
+        addCell(Paragraph(resultText).setFontSize(10f).setTextAlignment(TextAlignment.CENTER))
+    }
+}
+
+fun createStyledCell(text: String, font: PdfFont, bgColor: DeviceRgb, fontSize: Float) = Cell().apply {
+    add(Paragraph(text).setBold().setFontSize(fontSize))
+    setFont(font).setFontSize(fontSize)
+    setBackgroundColor(bgColor)
+    setTextAlignment(TextAlignment.CENTER)
+    setVerticalAlignment(VerticalAlignment.MIDDLE)
+}
+
+fun createImageFromChart(image: BufferedImage) = ByteArrayOutputStream().apply {
+    ImageIO.write(image, "png", this)
+}.let { Image(ImageDataFactory.create(it.toByteArray())) }
+
+fun createSummaryTable(results: List<PayloadResult>, headerFont: PdfFont, headerBgColor: DeviceRgb): Table {
+    val summaryTable = Table(floatArrayOf(80f, 20f))
+
+    summaryTable.addCell(
+        Cell().add(Paragraph("Test Type").setBold().setFontSize(12f))
+            .setBackgroundColor(headerBgColor)
+            .setTextAlignment(TextAlignment.CENTER)
+            .setFont(headerFont)
+    )
+    summaryTable.addCell(
+        Cell().add(Paragraph("Success Rate (%)").setBold().setFontSize(12f))
+            .setBackgroundColor(headerBgColor)
+            .setTextAlignment(TextAlignment.CENTER)
+            .setFont(headerFont)
+    )
+
+    val groupedByDescription = results.groupBy { it.source }
+    groupedByDescription.forEach { (description, descriptionResults) ->
+        val successCount = descriptionResults.count { it.statusCode == HTTP_FORBIDDEN_CODE }
+        val successRateForTestType = (successCount.toDouble() / descriptionResults.size) * 100
+        summaryTable.addCell(Paragraph(description).setFontSize(10f))
+        summaryTable.addCell(
+            Paragraph("%.2f".format(successRateForTestType)).setFontSize(10f).setTextAlignment(TextAlignment.CENTER)
+        )
+    }
+    return summaryTable
 }
 
 fun generatePieChart(success: Int, failure: Int): BufferedImage {
@@ -191,10 +163,5 @@ fun generatePieChart(success: Int, failure: Int): BufferedImage {
         deleteOnExit()
     }
     ggsave(p, tempFile.absolutePath)
-
     return ImageIO.read(tempFile)
-}
-
-fun String.insertBreaksEvery(n: Int): String {
-    return this.chunked(n).joinToString("\n")
 }
